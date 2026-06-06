@@ -35,3 +35,7 @@ yarn-error.log*
 # Database
 *.db
 backend/kisanmitra.db
+
+# Demo recordings (regenerate with demo/record-demo.mjs)
+demo/output/
+demo/node_modules/

@@ -66,6 +66,14 @@ NEXT_PUBLIC_API_URL=http://localhost:8000
 
 Without Supabase, data is stored in-memory (fine for demos).
 
+## Demo Video
+
+Download the walkthrough recording:
+
+- **GitHub:** [KisanMitra-Demo.mp4](https://github.com/Hindhuja7/Kisan/raw/main/frontend/public/KisanMitra-Demo.mp4)
+- **Local (with frontend running):** http://localhost:3000/KisanMitra-Demo.mp4
+- **Local file:** `frontend/public/KisanMitra-Demo.mp4`
+
 ## Demo Script
 
 1. Click **▶ Demo** — runs Crop → Price → Negotiation pipeline
