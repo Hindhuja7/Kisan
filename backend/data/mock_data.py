@@ -133,6 +133,25 @@ def get_matching_buyers(crop: str, quantity_tons: float) -> list[dict]:
     return sorted(matches, key=lambda x: x["offered_price_per_quintal"], reverse=True)
 
 
+def get_weather_alert() -> dict:
+    risks = ["heat_wave", "heavy_rain", "none", "none"]
+    risk = random.choice(risks)
+    return {
+        "condition": "partly_cloudy" if risk == "none" else risk,
+        "temp_c": round(random.uniform(28, 38), 1),
+        "rain_chance_pct": round(random.uniform(10, 60), 0) if risk == "heavy_rain" else round(random.uniform(5, 25), 0),
+        "alert": "Heavy rain expected in 48h — harvest early" if risk == "heavy_rain" else (
+            "Heat stress risk — increase irrigation" if risk == "heat_wave" else "Favorable conditions"
+        ),
+        "risk_level": "high" if risk != "none" else "low",
+    }
+
+
+def get_ndvi_grid(size: int = 8) -> list[list[float]]:
+    base = random.uniform(0.55, 0.85)
+    return [[round(max(0.3, min(0.95, base + random.uniform(-0.15, 0.15))), 2) for _ in range(size)] for _ in range(size)]
+
+
 def get_transport_options(origin: str, destination: str, quantity_tons: float) -> list[dict]:
     options = []
     distance_km = random.randint(80, 350)

@@ -2,15 +2,9 @@ import type { Metadata, Viewport } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "KisanMitra AI — Autonomous Agri Supply Chain",
-  description:
-    "Multi-agent AI platform for Indian farmers — crop readiness, mandi prices, cold storage, buyer negotiation, logistics & finance. Team Nexora · HackArena 2.0",
+  title: "KisanMitra AI — Autonomous Agri OS for Indian Farmers",
+  description: "AI-powered supply chain manager: crop readiness, mandi intelligence, buyer negotiation, logistics & WhatsApp — Team Nexora",
   manifest: "/manifest.json",
-  appleWebApp: {
-    capable: true,
-    statusBarStyle: "black-translucent",
-    title: "KisanMitra AI",
-  },
 };
 
 export const viewport: Viewport = {

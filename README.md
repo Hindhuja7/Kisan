@@ -38,7 +38,19 @@ npm install
 npm run dev
 ```
 
-Open http://localhost:3000
+Open http://localhost:3000/login
+
+## Deploy (free — phone & laptop)
+
+Full guide: **[DEPLOY.md](./DEPLOY.md)**
+
+| Step | Platform | Action |
+|------|----------|--------|
+| 1 | [Render](https://render.com) | New → Blueprint → connect `Hindhuja7/Kisan` → deploys **kisanmitra-api** |
+| 2 | [Vercel](https://vercel.com) | New Project → root folder **`frontend`** → add env `NEXT_PUBLIC_API_URL=https://kisanmitra-api.onrender.com` |
+| 3 | Render | Set `CORS_ORIGINS` to your Vercel URL |
+
+**After deploy:** share `https://your-app.vercel.app/login` — works on any phone with internet.
 
 ## Environment Variables
 
@@ -55,7 +67,7 @@ CORS_ORIGINS=http://localhost:3000
 **Frontend** (`frontend/.env.local`):
 
 ```
-NEXT_PUBLIC_API_URL=http://localhost:8000
+NEXT_PUBLIC_API_URL=http://localhost:8001
 ```
 
 ## Supabase Setup

@@ -17,6 +17,18 @@ from data.mock_data import (
     get_mandi_prices,
     get_price_forecast,
     get_matching_buyers,
+    get_storage_availability,
+    get_transport_options,
+    get_weather_alert,
+    get_ndvi_grid,
+)
+from agents.reasoning import (
+    CROP_REASONING,
+    PRICE_REASONING,
+    STORAGE_REASONING,
+    NEGOTIATION_REASONING,
+    LOGISTICS_REASONING,
+    stamp,
 )
 from services.llm import gpt_json, gpt_text
 from models.schemas import AgentResult, DemoWorkflowRequest
@@ -45,6 +57,19 @@ NegotiationRequestLike = _Neg
 
 def _llm():
     return ChatOpenAI(model=settings.openai_model, api_key=settings.openai_api_key, temperature=0.4)
+
+
+def _result(agent: str, status: str, summary: str, advisory: str, data: dict, reasoning: list[str], confidence: float = 0.88) -> AgentResult:
+    return AgentResult(
+        agent=agent,
+        status=status,
+        summary=summary,
+        advisory=advisory,
+        data=data,
+        reasoning=reasoning,
+        confidence=confidence,
+        completed_at=stamp(),
+    )
 
 
 def run_crop_readiness(req: CropReadinessRequestLike) -> AgentResult:
@@ -99,12 +124,12 @@ def run_crop_readiness(req: CropReadinessRequestLike) -> AgentResult:
         f"Crop: {req.crop}, IoT: {iot}, Satellite: {satellite}, Language: {lang}",
         fallback,
     )
-    return AgentResult(
-        agent="Crop Readiness Agent",
-        status="completed",
-        summary=enhanced.get("summary", fallback["summary"]),
-        advisory=enhanced.get("advisory", fallback["advisory"]),
-        data={"iot": iot, "satellite": satellite, **enhanced},
+    return _result(
+        "Crop Readiness Agent", "completed",
+        enhanced.get("summary", fallback["summary"]),
+        enhanced.get("advisory", fallback["advisory"]),
+        {"iot": iot, "satellite": satellite, "ndvi_grid": get_ndvi_grid(), "weather": get_weather_alert(), **enhanced},
+        CROP_REASONING, 0.92,
     )
 
 
@@ -158,12 +183,13 @@ def run_price_intelligence(req: PriceIntelRequestLike) -> AgentResult:
         f"Crop: {req.crop}, Prices: {prices[:4]}, Forecast: {forecast}, Lang: {lang}",
         fallback,
     )
-    return AgentResult(
-        agent="Price Intelligence Agent",
-        status="completed",
-        summary=enhanced.get("summary", fallback["summary"]),
-        advisory=enhanced.get("advisory", fallback["advisory"]),
-        data={"prices": prices[:6], "forecast": forecast, **enhanced},
+    conf = forecast.get("confidence", 0.87)
+    return _result(
+        "Price Intelligence Agent", "completed",
+        enhanced.get("summary", fallback["summary"]),
+        enhanced.get("advisory", fallback["advisory"]),
+        {"prices": prices[:6], "forecast": forecast, "recommended_sell_date": forecast.get("recommendation", "hold_1_week"), **enhanced},
+        PRICE_REASONING, conf,
     )
 
 
@@ -184,9 +210,9 @@ def run_buyer_negotiation(req: NegotiationRequestLike) -> AgentResult:
         )
 
     log = [
-        {"round": 1, "party": "buyer", "offer": round(best["offered_price_per_quintal"] * 0.92)},
-        {"round": 2, "party": "agent", "offer": round(best["offered_price_per_quintal"] * 0.97)},
-        {"round": 3, "party": "buyer", "offer": best["offered_price_per_quintal"], "status": "accepted"},
+        {"round": 1, "party": "buyer", "offer": round(best["offered_price_per_quintal"] * 0.92), "reasoning": "Buyer opens below mandi average to test floor"},
+        {"round": 2, "party": "agent", "offer": round(best["offered_price_per_quintal"] * 0.97), "reasoning": "AI counters with real-time mandi data + transport savings proof"},
+        {"round": 3, "party": "buyer", "offer": best["offered_price_per_quintal"], "status": "accepted", "reasoning": "Buyer accepts — bulk volume + quality grade verified"},
     ]
     deal_value = round(best["offered_price_per_quintal"] * req.quantity_tons * 10)
     uplift = round(((best["offered_price_per_quintal"] - local) / local) * 100, 1)
@@ -237,12 +263,50 @@ def run_buyer_negotiation(req: NegotiationRequestLike) -> AgentResult:
         f"Buyer: {best}, Local: {local}, Lang: {lang}",
         fallback,
     )
-    return AgentResult(
-        agent="Buyer Negotiation Agent",
-        status="completed",
-        summary=enhanced.get("summary", fallback["summary"]),
-        advisory=enhanced.get("advisory", fallback["advisory"]),
-        data={**fallback, **enhanced},
+    return _result(
+        "Buyer Negotiation Agent", "completed",
+        enhanced.get("summary", fallback["summary"]),
+        enhanced.get("advisory", fallback["advisory"]),
+        {**fallback, **enhanced, "savings_inr": round((best["offered_price_per_quintal"] - local) * req.quantity_tons * 10)},
+        NEGOTIATION_REASONING, 0.91,
+    )
+
+
+def run_cold_storage(req: _Req, harvest_date: str, quantity_tons: float) -> AgentResult:
+    facilities = get_storage_availability(harvest_date)
+    best = min(facilities, key=lambda f: f["negotiated_rate_per_ton_day"])
+    import random
+    booking_id = f"CSB-{random.randint(10000, 99999)}"
+    lang = req.language.value
+    saved = best["rate_per_ton_day"] - best["negotiated_rate_per_ton_day"]
+    advisory = (
+        f"Booked {best['name']} — {booking_id}. Saved ₹{saved}/ton/day vs listed rate."
+        if lang == "en" else f"❄️ {best['name']} బుక్ — {booking_id}"
+    )
+    return _result(
+        "Cold Storage Agent", "completed",
+        f"Cold storage confirmed at {best['name']}",
+        advisory,
+        {"booking_id": booking_id, "facility": best, "reserved_tons": min(quantity_tons, best["available_tons"]), "status": "confirmed", "savings_per_day": saved},
+        STORAGE_REASONING, 0.89,
+    )
+
+
+def run_logistics(origin: str, destination: str, quantity_tons: float) -> AgentResult:
+    options = get_transport_options(origin, destination, quantity_tons)
+    best = options[0] if options else {}
+    stages = [
+        {"stage": "Farm Gate Pickup", "status": "scheduled", "location": origin},
+        {"stage": "Cold Storage Hub", "status": "pending", "location": "Shamshabad"},
+        {"stage": "Buyer Warehouse", "status": "pending", "location": destination},
+        {"stage": "Market Delivery", "status": "pending", "location": destination},
+    ]
+    return _result(
+        "Logistics Coordinator Agent", "completed",
+        f"Route optimized — tracking {best.get('tracking_id', 'KM-000000')}",
+        f"ETA {best.get('eta_hours', 6)}h · ₹{best.get('estimated_cost_inr', 0)} transport cost",
+        {"vehicle": best, "stages": stages, "tracking_id": best.get("tracking_id"), "tracking_url": f"https://track.kisanmitra.ai/{best.get('tracking_id', '')}", "route": f"{origin} → Shamshabad → {destination}"},
+        LOGISTICS_REASONING, 0.86,
     )
 
 
@@ -252,15 +316,19 @@ def run_demo_workflow(req: DemoWorkflowRequest) -> dict:
     price_req = _Req(None, req.crop, req.language)
     neg_req = _Neg(req.crop, req.quantity_tons, req.language)
 
-    steps = [
-        run_crop_readiness(crop_req),
-        run_price_intelligence(price_req),
-        run_buyer_negotiation(neg_req),
-    ]
+    crop_step = run_crop_readiness(crop_req)
+    harvest_date = crop_step.data.get("iot", {}).get("optimal_harvest_window", {}).get("start", datetime.now().strftime("%Y-%m-%d"))
+    price_step = run_price_intelligence(price_req)
+    storage_step = run_cold_storage(crop_req, harvest_date, req.quantity_tons)
+    neg_step = run_buyer_negotiation(neg_req)
+    best_mandi = price_step.data.get("best_mandi", "Hyderabad")
+    logistics_step = run_logistics(req.farmer_id and "Warangal" or "Warangal", str(best_mandi), req.quantity_tons)
 
-    deal_step = steps[2]
-    deal_value = deal_step.data.get("deal_value_inr", 0)
-    uplift = deal_step.data.get("uplift_pct", 40.0)
+    steps = [crop_step, price_step, storage_step, neg_step, logistics_step]
+    deal_value = neg_step.data.get("deal_value_inr", 0)
+    uplift = neg_step.data.get("uplift_pct", 40.0)
+    transport = logistics_step.data.get("vehicle", {}).get("estimated_cost_inr", 0)
+    net_income = deal_value - transport
 
     return {
         "workflow_id": workflow_id,
@@ -269,7 +337,9 @@ def run_demo_workflow(req: DemoWorkflowRequest) -> dict:
         "status": "completed",
         "steps": [s.model_dump() for s in steps],
         "deal_value_inr": deal_value,
+        "net_income_inr": net_income,
         "income_uplift_pct": uplift,
+        "ai_confidence_avg": round(sum(s.confidence for s in steps) / len(steps), 2),
         "completed_at": datetime.now().isoformat(),
     }
 
@@ -277,11 +347,12 @@ def run_demo_workflow(req: DemoWorkflowRequest) -> dict:
 def _template_advisory(kind: str, crop: str, primary: dict, secondary: dict, lang: str) -> str:
     if kind == "crop":
         w = primary["optimal_harvest_window"]
+        health = secondary.get("health_score", primary.get("health_score", 85))
         if lang == "te":
-            return f"మీ {crop} {w['start']}–{w['end']} మధ్య కోయండి. NDVI {secondary.get('ndvi_mean', primary.get('ndvi_index'))}."
+            return f"మీ {crop} {w['start']} నుండి {w['end']} మధ్య కోయండి. పంట ఆరోగ్యం {health}/100 — చాలా బాగుంది."
         if lang == "hi":
-            return f"{crop} को {w['start']}–{w['end']} के बीच काटें। NDVI {secondary.get('ndvi_mean', primary.get('ndvi_index'))}।"
-        return f"Harvest {crop} between {w['start']} and {w['end']}. NDVI: {secondary.get('ndvi_mean', primary.get('ndvi_index'))}."
+            return f"{crop} को {w['start']} से {w['end']} के बीच काटें। फसल स्वास्थ्य {health}/100 — बहुत अच्छी है।"
+        return f"Harvest {crop} between {w['start']} and {w['end']}. Crop health score: {health}/100 — looking good."
 
     if kind == "price":
         best = primary["best"]
@@ -290,7 +361,7 @@ def _template_advisory(kind: str, crop: str, primary: dict, secondary: dict, lan
             return f"{best['mandi_name']} లో ₹{best['price_per_quintal_inr']}/క్వింటాల్ — స్థానిక వ్యాపారి కంటే ₹{uplift} ఎక్కువ."
         if lang == "hi":
             return f"{best['mandi_name']} में ₹{best['price_per_quintal_inr']}/क्विंटल — स्थानीय व्यापारी से ₹{uplift} अधिक।"
-        return f"Sell at {best['mandi_name']}: ₹{best['price_per_quintal_inr']}/qtl vs local trader (+₹{uplift}/qtl)."
+        return f"Sell at {best['mandi_name']}: ₹{best['price_per_quintal_inr']} per quintal — ₹{uplift} more than local trader."
 
     if kind == "deal":
         buyer = primary["buyer"]

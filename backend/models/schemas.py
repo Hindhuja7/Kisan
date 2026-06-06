@@ -50,6 +50,9 @@ class AgentResult(BaseModel):
     summary: str
     advisory: str
     data: dict = {}
+    reasoning: list[str] = []
+    confidence: float = 0.85
+    completed_at: Optional[str] = None
 
 
 class DemoWorkflowRequest(BaseModel):

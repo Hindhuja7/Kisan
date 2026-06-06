@@ -3,53 +3,106 @@
 @tailwind utilities;
 
 :root {
-  --background: #0a0f0d;
+  --background: #060a09;
   --foreground: #f0fdf4;
 }
 
 body {
   color: var(--foreground);
   background: var(--background);
-  font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+  font-family: system-ui, -apple-system, "Segoe UI", "Noto Sans Telugu", "Noto Sans Devanagari", sans-serif;
+  font-size: 16px;
+  line-height: 1.5;
+}
+
+@media (max-width: 640px) {
+  body { font-size: 17px; }
 }
 
 @keyframes fade-in {
-  from {
-    opacity: 0;
-    transform: translateY(8px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
 }
 
 .animate-fade-in {
   animation: fade-in 0.5s ease-out forwards;
 }
 
-@keyframes pulse-glow {
-  0%, 100% {
-    box-shadow: 0 0 20px rgba(16, 185, 129, 0.2);
-  }
-  50% {
-    box-shadow: 0 0 40px rgba(16, 185, 129, 0.4);
-  }
+.stagger-1 { animation-delay: 0.05s; }
+.stagger-2 { animation-delay: 0.1s; }
+.stagger-3 { animation-delay: 0.15s; }
+.stagger-4 { animation-delay: 0.2s; }
+.stagger-5 { animation-delay: 0.25s; }
+.stagger-6 { animation-delay: 0.3s; }
+
+@keyframes ai-glow-pulse {
+  0%, 100% { box-shadow: 0 0 20px rgba(16, 185, 129, 0.15), inset 0 1px 0 rgba(255,255,255,0.05); }
+  50% { box-shadow: 0 0 35px rgba(16, 185, 129, 0.35), inset 0 1px 0 rgba(255,255,255,0.08); }
 }
 
-.hero-glow {
-  animation: pulse-glow 3s ease-in-out infinite;
+.ai-glow {
+  animation: ai-glow-pulse 2.5s ease-in-out infinite;
 }
 
-/* Custom scrollbar */
-::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
+@keyframes typing-bounce {
+  0%, 60%, 100% { transform: translateY(0); opacity: 0.4; }
+  30% { transform: translateY(-4px); opacity: 1; }
 }
-::-webkit-scrollbar-track {
-  background: transparent;
+
+.typing-dot {
+  animation: typing-bounce 1.2s ease-in-out infinite;
 }
-::-webkit-scrollbar-thumb {
-  background: rgba(16, 185, 129, 0.3);
-  border-radius: 3px;
+
+@keyframes truck-move {
+  0% { left: 15%; }
+  50% { left: 45%; }
+  100% { left: 75%; }
 }
+
+.truck-animate {
+  position: absolute;
+  animation: truck-move 4s ease-in-out infinite alternate;
+}
+
+@keyframes route-dash {
+  to { stroke-dashoffset: -20; }
+}
+
+.route-animate {
+  animation: route-dash 1s linear infinite;
+}
+
+@keyframes deal-pop {
+  0% { transform: scale(0.9); opacity: 0; }
+  60% { transform: scale(1.02); }
+  100% { transform: scale(1); opacity: 1; }
+}
+
+.deal-success-pop {
+  animation: deal-pop 0.6s ease-out forwards;
+}
+
+@keyframes mic-pulse {
+  0%, 100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.45); }
+  50% { transform: scale(1.06); box-shadow: 0 0 0 12px rgba(239, 68, 68, 0); }
+}
+
+.mic-listening {
+  animation: mic-pulse 1.2s ease-in-out infinite;
+}
+
+@keyframes voice-wave {
+  0%, 100% { height: 8px; }
+  50% { height: 22px; }
+}
+
+.voice-bar {
+  width: 4px;
+  border-radius: 2px;
+  background: #34d399;
+  animation: voice-wave 0.8s ease-in-out infinite;
+}
+
+::-webkit-scrollbar { width: 5px; height: 5px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: rgba(16, 185, 129, 0.25); border-radius: 3px; }
